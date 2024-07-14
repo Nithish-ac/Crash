@@ -112,7 +112,7 @@ namespace Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio
 
         #region -- Button Events ---
 
-        public void JoinChannel(string channelName)
+        public void JoinChannel()
         {
             RtcEngine.JoinChannel(_token, _channelName, "", 0);
         }

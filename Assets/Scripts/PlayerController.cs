@@ -13,14 +13,14 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private NetworkRigidbody2D _rb;
     [SerializeField] private Sprite[] _sprites;
 
-    private string _channelName;
     private SpriteRenderer _player;
     private Vector2 _direction;
     private void Start()
     {
         _player = GetComponent<SpriteRenderer>();
-        _channelName = gameObject.name;
     }
+
+    // Update player movement based on input
     public override void FixedUpdateNetwork()
     {
         if (HasStateAuthority)
@@ -34,11 +34,13 @@ public class PlayerController : NetworkBehaviour
         }
 
     }
+
+    // Handle player collision for audio communication
     private void OnTriggerEnter2D(Collider2D collision)
     {
         if (collision.gameObject.tag == "Player")
         {
-            JoinChannelAudio._instance.JoinChannel("Crash");
+            JoinChannelAudio._instance.JoinChannel();
             _player.sprite = _sprites[1];
         }
     }

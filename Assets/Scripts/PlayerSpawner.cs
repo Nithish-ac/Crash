@@ -12,7 +12,6 @@ public class PlayerSpawner : MonoBehaviour, INetworkRunnerCallbacks
 
     public void Host()
     {
-
         StartGame(GameMode.Shared);
     }
 
