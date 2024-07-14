@@ -43,7 +43,6 @@ This project is a multiplayer 2D application using Photon for networking and Ago
 ## Code Structure
 - **PlayerSpawner.cs**: Handles player spawning and game session management.
 - **PlayerController.cs**: Manages player movement and collision-based communication.
-- **InputController.cs**: Collects player input and manages network input callbacks.
 
 ## Functionality
 ### Player Spawning and Movement
