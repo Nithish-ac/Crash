@@ -13,8 +13,9 @@ public class InputController : NetworkBehaviour, INetworkRunnerCallbacks
 
     public override void Spawned()
     {
-        if (Object.HasInputAuthority)
+        if (Object.HasStateAuthority)
         {
+            Debug.Log("Callbacks Added");
             Runner.AddCallbacks(this);
         }
     }
@@ -25,7 +26,8 @@ public class InputController : NetworkBehaviour, INetworkRunnerCallbacks
         
         currentInput.Buttons.Set(InputButton.LEFT, Input.GetKey(KeyCode.A));
         currentInput.Buttons.Set(InputButton.RIGHT, Input.GetKey(KeyCode.D));
-
+        currentInput.Buttons.Set(InputButton.UP, Input.GetKey(KeyCode.W));
+        currentInput.Buttons.Set(InputButton.DOWN, Input.GetKey(KeyCode.S));
         input.Set(currentInput);
     }
 

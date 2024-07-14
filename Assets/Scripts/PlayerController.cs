@@ -4,47 +4,52 @@ using UnityEngine;
 using Fusion;
 using UnityEngine.EventSystems;
 using Fusion.Addons.Physics;
+using UnityEngine.Windows;
+using Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio;
 
 public class PlayerController : NetworkBehaviour
 {
-    private NetworkRigidbody2D _rb;
-    [SerializeField] float _speed = 10f;
-    void Start()
-    {
-        _rb = GetComponent<NetworkRigidbody2D>();
-    }
+    [SerializeField] private float _speed = 5f;
+    [SerializeField] private NetworkRigidbody2D _rb;
+    [SerializeField] private Sprite[] _sprites;
 
-    void Update()
+    private string _channelName;
+    private SpriteRenderer _player;
+    private Vector2 _direction;
+    private void Start()
     {
-        if (Object.HasInputAuthority)
+        _player = GetComponent<SpriteRenderer>();
+        _channelName = gameObject.name;
+    }
+    public override void FixedUpdateNetwork()
+    {
+        if (HasStateAuthority)
         {
-            Vector2 move = new Vector2(Input.GetAxis("Horizontal"), Input.GetAxis("Vertical"));
-            _rb.Rigidbody.velocity = move * _speed;
+            float moveX = UnityEngine.Input.GetAxis("Horizontal");
+            float moveY = UnityEngine.Input.GetAxis("Vertical");
+
+            _direction = new Vector2(moveX, moveY).normalized;
+
+            _rb.Rigidbody.velocity = _direction * _speed;
+        }
+
+    }
+    private void OnTriggerEnter2D(Collider2D collision)
+    {
+        if (collision.gameObject.tag == "Player")
+        {
+            JoinChannelAudio._instance.JoinChannel("Crash");
+            _player.sprite = _sprites[1];
         }
     }
-
-    //public override void FixedUpdateNetwork()
-    //{
-    //    if (GetInput<InputData>(out var input))
-    //    {
-    //    if (input.GetButton(InputButton.LEFT))
-    //        {
-    //            //Reset x velocity if start moving in oposite direction.
-    //            if (_rb.Rigidbody.velocity.x > 0)
-    //            {
-    //                _rb.Rigidbody.velocity *= Vector2.up;
-    //            }
-    //            _rb.Rigidbody.AddForce(Vector2.left * _speed * Runner.DeltaTime, ForceMode2D.Force);
-    //        }
-    //        else if (input.GetButton(InputButton.RIGHT) && _behaviour.InputsAllowed)
-    //        {
-    //            //Reset x velocity if start moving in oposite direction.
-    //            if (_rb.Rigidbody.velocity.x < 0 && IsGrounded)
-    //            {
-    //                _rb.Rigidbody.velocity *= Vector2.up;
-    //            }
-    //            _rb.Rigidbody.AddForce(Vector2.right * _speed * Runner.DeltaTime, ForceMode2D.Force);
-    //        }
-    //    }
-    //}
+    private void OnTriggerExit2D(Collider2D collision)
+    {
+        if (collision.gameObject.tag == "Player")
+        {
+            JoinChannelAudio._instance.LeaveChannel();
+            _player.sprite = _sprites[0];
+        }
+    }
 }
+
+

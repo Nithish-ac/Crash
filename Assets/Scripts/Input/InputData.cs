@@ -4,8 +4,10 @@ using UnityEngine;
 [System.Flags]
 public enum InputButton
 {
-    LEFT = 1 << 0,
-    RIGHT = 1 << 1
+    LEFT,
+    RIGHT,
+    UP, 
+    DOWN
 }
 
 public struct InputData : INetworkInput
