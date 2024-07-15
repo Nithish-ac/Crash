@@ -15,6 +15,8 @@ public class PlayerController : NetworkBehaviour
 
     private SpriteRenderer _player;
     private Vector2 _direction;
+    private List<GameObject> connectedPlayers = new List<GameObject>();
+
     private void Start()
     {
         _player = GetComponent<SpriteRenderer>();
@@ -40,7 +42,11 @@ public class PlayerController : NetworkBehaviour
     {
         if (collision.gameObject.tag == "Player")
         {
-            JoinChannelAudio._instance.JoinChannel();
+            if (!connectedPlayers.Contains(collision.gameObject))
+            {
+                connectedPlayers.Add(collision.gameObject);
+                JoinChannelAudio._instance.JoinChannel();
+            }
             _player.sprite = _sprites[1];
         }
     }
@@ -48,8 +54,15 @@ public class PlayerController : NetworkBehaviour
     {
         if (collision.gameObject.tag == "Player")
         {
-            JoinChannelAudio._instance.LeaveChannel();
-            _player.sprite = _sprites[0];
+            if (connectedPlayers.Contains(collision.gameObject))
+            {
+                connectedPlayers.Remove(collision.gameObject);
+                if (connectedPlayers.Count == 0)
+                {
+                    JoinChannelAudio._instance.LeaveChannel();
+                    _player.sprite = _sprites[0];
+                }
+            }
         }
     }
 }
