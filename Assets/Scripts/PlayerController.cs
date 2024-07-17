@@ -2,10 +2,11 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Fusion;
-using UnityEngine.EventSystems;
 using Fusion.Addons.Physics;
-using UnityEngine.Windows;
 using Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio;
+using Unity.VisualScripting.Antlr3.Runtime;
+using System.Threading;
+using System;
 
 public class PlayerController : NetworkBehaviour
 {
@@ -13,6 +14,9 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private NetworkRigidbody2D _rb;
     [SerializeField] private Sprite[] _sprites;
 
+    private int _playerID;
+    private string _channelName;
+    private string _token;
     private SpriteRenderer _player;
     private Vector2 _direction;
     private List<GameObject> connectedPlayers = new List<GameObject>();
@@ -20,6 +24,7 @@ public class PlayerController : NetworkBehaviour
     private void Start()
     {
         _player = GetComponent<SpriteRenderer>();
+        _playerID = SetPlayerID();
     }
 
     // Update player movement based on input
@@ -45,9 +50,10 @@ public class PlayerController : NetworkBehaviour
             if (!connectedPlayers.Contains(collision.gameObject))
             {
                 connectedPlayers.Add(collision.gameObject);
-                JoinChannelAudio._instance.JoinChannel();
+                PlayerController obj = collision.gameObject.GetComponent<PlayerController>();
+                AgoraManager.Instance.JoinChannel(this, obj);
+                _player.sprite = _sprites[1];
             }
-            _player.sprite = _sprites[1];
         }
     }
     private void OnTriggerExit2D(Collider2D collision)
@@ -59,12 +65,22 @@ public class PlayerController : NetworkBehaviour
                 connectedPlayers.Remove(collision.gameObject);
                 if (connectedPlayers.Count == 0)
                 {
-                    JoinChannelAudio._instance.LeaveChannel();
+                    AgoraManager.Instance.LeaveChannel();
+                    _channelName = string.Empty;
+                    _token = string.Empty;
                     _player.sprite = _sprites[0];
                 }
             }
         }
     }
+    public string GetChannelName() { return _channelName; }
+    public void SetChannelName(string name) { _channelName = name; }
+
+    public string GetToken() { return _token; }
+    public void SetToken(string newToken) { _token = newToken; }
+
+    public int GetPlayerId() { return _playerID; }
+    public static int SetPlayerID() => UnityEngine.Random.Range(10000, 99999);
 }
 
 

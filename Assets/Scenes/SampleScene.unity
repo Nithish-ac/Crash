@@ -1632,7 +1632,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1358246014}
-  - component: {fileID: 1358246013}
+  - component: {fileID: 1358246015}
   m_Layer: 0
   m_Name: VoiceManager
   m_TagString: Untagged
@@ -1640,24 +1640,6 @@ GameObject:
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!114 &1358246013
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1358246012}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 51684c34d5d52411f905a5ba6aa4562e, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _appIdInput: {fileID: 11400000, guid: 300c6525f002a4dbaac41a5c4b054e35, type: 2}
-  _appID: 1cd8550c090440fca1c37e9e7db525a2
-  _token: 007eJxTYDi6fGLcGa7AIJNpCyYzCHx6xatlv82a/VTeh1mO88uqdxxTYDBMTrEwNTVINrA0MDExSEtONEw2Nk+1TDVPSTI1Mk00ykiZnNYQyMiwfY4fKyMDBIL4rAzORYnFGQwMADz8Hzs=
-  _channelName: Crash
-  LogText: {fileID: 1635882473}
-  _audioDeviceSelect: {fileID: 48865033}
 --- !u!4 &1358246014
 Transform:
   m_ObjectHideFlags: 0
@@ -1673,6 +1655,22 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1358246015
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1358246012}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3f5a1be3563683345aa62f3b28c10ac1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  appID: 272ca347442044b0b034bd46d30713fb
+  canvas: {fileID: 1144377025}
+  tokenBase: https://agoraapi.vercel.app/token
+  connectionState: 1
 --- !u!1 &1380324350
 GameObject:
   m_ObjectHideFlags: 0
