@@ -35,11 +35,9 @@ namespace Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio
         private IAudioDeviceManager _audioDeviceManager;
         private DeviceInfo[] _audioPlaybackDeviceInfos;
         public Dropdown _audioDeviceSelect;
-
-        // Start is called before the first frame update
         private void Awake()
         {
-            if (_instance == null)
+            if(_instance== null)
             {
                 _instance = this;
             }
@@ -48,6 +46,8 @@ namespace Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio
                 Destroy(_instance);
             }
         }
+
+        // Start is called before the first frame update
         private void Start()
         {
             LoadAssetData();
@@ -111,6 +111,23 @@ namespace Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio
         }
 
         #region -- Button Events ---
+
+        public void StartEchoTest()
+        {
+            EchoTestConfiguration config = new EchoTestConfiguration();
+            config.intervalInSeconds = 2;
+            config.enableAudio = true;
+            config.enableVideo = false;
+            config.token = this._appID;
+            config.channelId = "echo_test_channel";
+            RtcEngine.StartEchoTest(config);
+            Log.UpdateLog("StartEchoTest, speak now. You cannot conduct another echo test or join a channel before StopEchoTest");
+        }
+
+        public void StopEchoTest()
+        {
+            RtcEngine.StopEchoTest();
+        }
 
         public void JoinChannel()
         {
