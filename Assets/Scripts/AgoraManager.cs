@@ -108,19 +108,25 @@ public class AgoraManager : MonoBehaviour
         {
             Debug.Log(" both dont have channels ");
             channelName = GenerateChannelName();
-            channels. = channelName;
-            channels[player2Info.gameObject] = channelName;
+            player1Info.SetChannelName(channelName);
+            player2Info.SetChannelName(channelName);
+            HashSet<PlayerController> controls = new HashSet<PlayerController>();
+            controls.Add(player1Info);
+            controls.Add(player2Info);
+            channels.Add(channelName, controls);
 
         }
         else if (!channel1.IsNullOrEmpty() && channel2.IsNullOrEmpty())
         {
-            channels[player2Info.gameObject] = channel1;
             channelName = channel1;
+            player2Info.SetChannelName(channelName);
+            channels[channel1].Add(player2Info);
         }
         else if (channel1.IsNullOrEmpty() && !channel2.IsNullOrEmpty())
         {
-            channels[player1Info.gameObject] = channel2;
             channelName = channel2;
+            player2Info.SetChannelName(channelName);
+            channels[channel1].Add(player2Info);
         }
         else
         {
@@ -131,14 +137,15 @@ public class AgoraManager : MonoBehaviour
             {
                 foreach (var member in group2)
                 {
-                    channels[member] = channel1;
+                    channels[channel1].Add(member);
+
                 }
             }
             else
             {
                 foreach (var member in group1)
                 {
-                    channels[member] = channel2;
+                    channels[channel2].Add(member);
                 }
             }
         }

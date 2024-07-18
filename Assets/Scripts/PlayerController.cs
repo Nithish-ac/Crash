@@ -81,6 +81,7 @@ public class PlayerController : NetworkBehaviour
 
     public int GetPlayerId() { return _playerID; }
     public static int SetPlayerID() => UnityEngine.Random.Range(10000, 99999);
+    public void TriggerJoin(PlayerController _playerController) => AgoraManager.Instance.JoinChannel(this,_playerController);
 }
 
 
