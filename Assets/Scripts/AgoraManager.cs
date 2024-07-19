@@ -1,15 +1,10 @@
 using Agora.Rtc;
 using Agora_RTC_Plugin.API_Example;
-using ExitGames.Client.Photon.StructWrapping;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using Unity.VisualScripting;
 using UnityEngine;
 using UnityEngine.UI;
-using WebSocketSharp;
-using static UnityEditor.Experimental.GraphView.GraphView;
-
+using Fusion;
 public class AgoraManager : MonoBehaviour
 {
     public static AgoraManager Instance { get; private set; }
@@ -21,24 +16,18 @@ public class AgoraManager : MonoBehaviour
     private IRtcEngine RtcEngine;
 
     private string token = "";
-    private string channelName = "Sample";
+    private string channelName = "";
     private PlayerController mainPlayerInfo;
-    private PlayerController clientPlayerInfo;
 
     public CONNECTION_STATE_TYPE connectionState = CONNECTION_STATE_TYPE.CONNECTION_STATE_DISCONNECTED;
-    public Dictionary<string, List<uint>> usersJoinedInAChannel;
-    private DSU dsu;
-    private Dictionary<int, List<int>> neighbors = new Dictionary<int, List<int>>();
-    private Dictionary<string, HashSet<PlayerController>> channels = new Dictionary<string, HashSet<PlayerController>>();
 
+    public NetworkDictionary<string, List<PlayerController>> networkTable = new NetworkDictionary<string, List<PlayerController>>();
+    private int channelCount = 0;
 
 
     private void Awake()
     {
         Instance = this;
-        usersJoinedInAChannel = new Dictionary<string, List<uint>>();
-        dsu = new DSU();
-
     }
 
     private void Start()
@@ -82,79 +71,95 @@ public class AgoraManager : MonoBehaviour
     #endregion
 
     #region Channel Join/Leave Handler Functions
-
-    /// <summary>
-    /// The function that is to be called whenever a collision happens. Determines the channel to be joined for the main player based on some conditions.
-    /// </summary>
-    /// <param name="player1Info"></param>
-    /// <param name="player2Info"></param>
-    public void JoinChannel(PlayerController player1Info, PlayerController player2Info)
+    public void JoinChannel(PlayerController player1, PlayerController player2)
     {
-        if (!neighbors.ContainsKey(player1Info.GetPlayerId())) neighbors[player1Info.GetPlayerId()] = new List<int>();
-        if (!neighbors.ContainsKey(player2Info.GetPlayerId())) neighbors[player2Info.GetPlayerId()] = new List<int>();
-
-        neighbors[player1Info.GetPlayerId()].Add(player2Info.GetPlayerId());
-        neighbors[player2Info.GetPlayerId()].Add(player1Info.GetPlayerId());
-
-        dsu.Add(player1Info);
-        dsu.Add(player2Info);
-        dsu.Union(player1Info, player2Info);
-
-        string channel1 = channels.ContainsKey(player1Info.GetChannelName()) ? player1Info.GetChannelName() : null;
-        string channel2 = channels.ContainsKey(player2Info.GetChannelName()) ? player2Info.GetChannelName() : null;
-
-        Debug.Log("channel names " + channel1 + "and" + channel2);
-        if (channel1.IsNullOrEmpty() && channel2.IsNullOrEmpty())
+        if (string.IsNullOrEmpty(player1.GetChannelName()) && string.IsNullOrEmpty(player2.GetChannelName()))
         {
-            Debug.Log(" both dont have channels ");
-            channelName = GenerateChannelName();
-            player1Info.SetChannelName(channelName);
-            player2Info.SetChannelName(channelName);
-            HashSet<PlayerController> controls = new HashSet<PlayerController>();
-            controls.Add(player1Info);
-            controls.Add(player2Info);
-            channels.Add(channelName, controls);
-
+            string newChannelName = GenerateChannelName();
+            AddPlayerToChannel(newChannelName, player1);
+            AddPlayerToChannel(newChannelName, player2);
         }
-        else if (!channel1.IsNullOrEmpty() && channel2.IsNullOrEmpty())
+        else if (!string.IsNullOrEmpty(player1.GetChannelName()) && string.IsNullOrEmpty(player2.GetChannelName()))
         {
-            channelName = channel1;
-            player2Info.SetChannelName(channelName);
-            channels[channel1].Add(player2Info);
+            AddPlayerToChannel(player1.GetChannelName(), player2);
         }
-        else if (channel1.IsNullOrEmpty() && !channel2.IsNullOrEmpty())
+        else if (string.IsNullOrEmpty(player1.GetChannelName()) && !string.IsNullOrEmpty(player2.GetChannelName()))
         {
-            channelName = channel2;
-            player2Info.SetChannelName(channelName);
-            channels[channel1].Add(player2Info);
+            AddPlayerToChannel(player2.GetChannelName(), player1);
         }
         else
         {
-            Debug.Log("Checking groups");
-            var group1 = new HashSet<PlayerController>(dsu.GetComponents(dsu.Find(player1Info)));
-            var group2 = new HashSet<PlayerController>(dsu.GetComponents(dsu.Find(player2Info)));
-            if (group1.Count >= group2.Count)
-            {
-                foreach (var member in group2)
-                {
-                    channels[channel1].Add(member);
-
-                }
-            }
-            else
-            {
-                foreach (var member in group1)
-                {
-                    channels[channel2].Add(member);
-                }
-            }
+            MergeChannels(player1.GetChannelName(), player2.GetChannelName());
         }
-        JoinChannel();
     }
+    private void AddPlayerToChannel(string channelName, PlayerController player)
+    {
+        if (!networkTable.ContainsKey(channelName))
+        {
+            networkTable[channelName] = new List<PlayerController>();
+            channelCount++;
+        }
+        networkTable[channelName].Add(player);
+        player.SetChannelName(channelName);
+        player.SetToken(GetTokenForChannel(channelName));
 
-    /// <summary>
-    /// Responsible for joining the user to a channel and making a video view of the user 
-    /// </summary>
+        if (token.Length == 0)
+        {
+            StartCoroutine(HelperClass.FetchToken(tokenBase, channelName, player.GetPlayerId(), UpdateToken));
+            return;
+        }
+
+        RtcEngine.JoinChannel(token, channelName, "", (uint)player.GetPlayerId());
+        RtcEngine.StartPreview();
+    }
+    private void MergeChannels(string channel1, string channel2)
+    {
+        List<PlayerController> channel1Players = networkTable[channel1];
+        List<PlayerController> channel2Players = networkTable[channel2];
+
+        if (channel1Players.Count >= channel2Players.Count)
+        {
+            foreach (var player in channel2Players)
+            {
+                AddPlayerToChannel(channel1, player);
+            }
+            networkTable.Remove(channel2);
+        }
+        else
+        {
+            foreach (var player in channel1Players)
+            {
+                AddPlayerToChannel(channel2, player);
+            }
+            networkTable.Remove(channel1);
+        }
+        channelCount--;
+    }
+    public void LeaveChannel(PlayerController player)
+    {
+        string channel = player.GetChannelName();
+        networkTable[channel].Remove(player);
+
+        if (networkTable[channel].Count == 0)
+        {
+            networkTable.Remove(channel);
+            channelCount--;
+        }
+
+        RtcEngine.LeaveChannel();
+        player.SetChannelName(string.Empty);
+        player.SetToken(string.Empty);
+    }
+    private void UpdateToken(string newToken)
+    {
+        token = newToken;
+        if (string.IsNullOrEmpty(channelName)) return;
+
+        foreach (var player in networkTable[channelName])
+        {
+            player.SetToken(token);
+        }
+    }
     private void JoinChannel()
     {
         //If a token is not yet generated, we first generate one and then join the channel
@@ -168,7 +173,6 @@ public class AgoraManager : MonoBehaviour
             }
             
             RtcEngine.JoinChannel(token, channelName, "", 0);
-            UpdateUsersInAChannelTable(channelName, 0);
             RtcEngine.StartPreview();
             MakeVideoView(0);
 
@@ -192,18 +196,6 @@ public class AgoraManager : MonoBehaviour
         RtcEngine.LeaveChannel();
     }
 
-    /// <summary>
-    /// Responsible for removing the sole user left in a channel
-    /// </summary>
-    public void LeaveChannelIfNoOtherUsersPresent()
-    {
-        string channel = mainPlayerInfo.GetChannelName();
-        if (usersJoinedInAChannel[channel].Count != 1) return;
-
-        RemoveAllTheUsersFromChannel(channel);
-        LeaveChannel();
-    }
-
     #endregion
 
     #region Helper Functions
@@ -220,35 +212,17 @@ public class AgoraManager : MonoBehaviour
             Destroy(videoView);
         }
     }
-
-    /// <summary>
-    /// Responsible for updating the users in a channel dictionary
-    /// </summary>
-    /// <param name="channel">
-    /// Name of the channel that the user is joining
-    /// </param>
-    /// <param name="uid">
-    /// User Id of the user
-    /// </param>
-    private void UpdateUsersInAChannelTable(string channel, uint uid)
-    {
-        if (usersJoinedInAChannel.ContainsKey(channel))
-        {
-            usersJoinedInAChannel[channel].Add(uid);
-        }
-        else
-        {
-            usersJoinedInAChannel.Add(channel, new List<uint> { uid });
-        }
-    }
-
     /// <summary>
     /// Generate a channel name at the runtime
     /// </summary>
     /// <returns></returns>
     private string GenerateChannelName()
     {
-        return GetRandomChannelName(10);
+        return "user_channel_" + (++channelCount);
+    }
+    private string GetTokenForChannel(string channelName)
+    {
+        return token; // Placeholder for fetching/generating a token
     }
 
     /// <summary>
@@ -273,36 +247,6 @@ public class AgoraManager : MonoBehaviour
         Debug.Log("RandomChannel name ="+randomChannelName);
         return randomChannelName;
     }
-
-    /// <summary>
-    /// Callback function for updating the token, whenever it is generated from the server
-    /// </summary>
-    /// <param name="newToken"></param>
-    private void UpdateToken(string newToken)
-    {
-        token = newToken;
-
-        mainPlayerInfo.SetToken(token);
-        clientPlayerInfo.SetToken(token);
-        if (connectionState == CONNECTION_STATE_TYPE.CONNECTION_STATE_DISCONNECTED || connectionState == CONNECTION_STATE_TYPE.CONNECTION_STATE_FAILED)
-        {
-            JoinChannel();
-        }
-    }
-
-    /// <summary>
-    /// Responsible for removing all the users from a channel
-    /// </summary>
-    /// <param name="userChannel">
-    /// Name of the channel
-    /// </param>
-    private void RemoveAllTheUsersFromChannel(string userChannel)
-    {
-        uint uid = usersJoinedInAChannel[userChannel][0];
-        usersJoinedInAChannel.Remove(userChannel);
-        DestroyVideoView(uid);
-    }
-
     /// <summary>
     /// Responsible for updating channel name and token of a player with the given values
     /// </summary>
@@ -421,11 +365,11 @@ public class AgoraManager : MonoBehaviour
         /// <param name="stats"></param>
         public override void OnLeaveChannel(RtcConnection connection, RtcStats stats)
         {
-            if (!agoraManager.usersJoinedInAChannel.ContainsKey(connection.channelId)) return;
+            if (!agoraManager.networkTable.ContainsKey(connection.channelId)) return;
 
-            foreach (uint uid in agoraManager.usersJoinedInAChannel[connection.channelId])
+            foreach (PlayerController uid in agoraManager.networkTable[connection.channelId])
             {
-                agoraManager.DestroyVideoView(uid);
+                agoraManager.DestroyVideoView((uint)uid.GetPlayerId());
             }
         }
 
@@ -439,7 +383,7 @@ public class AgoraManager : MonoBehaviour
         {
             agoraManager.MakeVideoView(uid, connection.channelId);
 
-            agoraManager.UpdateUsersInAChannelTable(connection.channelId, uid);
+            //agoraManager.UpdateUsersInAChannelTable(connection.channelId, uid);
         }
 
         /// <summary>
@@ -454,10 +398,10 @@ public class AgoraManager : MonoBehaviour
 
             string userChannel = connection.channelId;
 
-            if (agoraManager.usersJoinedInAChannel.ContainsKey(userChannel))
-            {
-                agoraManager.usersJoinedInAChannel[userChannel].Remove(uid);
-            }
+            //if (agoraManager.usersJoinedInAChannel.ContainsKey(userChannel))
+            //{
+            //    agoraManager.usersJoinedInAChannel[userChannel].Remove(uid);
+            //}
         }
 
         public override void OnConnectionStateChanged(RtcConnection connection, CONNECTION_STATE_TYPE state, CONNECTION_CHANGED_REASON_TYPE reason)

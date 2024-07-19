@@ -3,10 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using Fusion;
 using Fusion.Addons.Physics;
-using Agora_RTC_Plugin.API_Example.Examples.Basic.JoinChannelAudio;
-using Unity.VisualScripting.Antlr3.Runtime;
-using System.Threading;
-using System;
+using static UnityEngine.RuleTile.TilingRuleOutput;
 
 public class PlayerController : NetworkBehaviour
 {
@@ -19,7 +16,7 @@ public class PlayerController : NetworkBehaviour
     private string _token;
     private SpriteRenderer _player;
     private Vector2 _direction;
-    private List<GameObject> connectedPlayers = new List<GameObject>();
+    private List<GameObject> neighbours = new List<GameObject>();
 
     private void Start()
     {
@@ -45,31 +42,23 @@ public class PlayerController : NetworkBehaviour
     // Handle player collision for audio communication
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (collision.gameObject.tag == "Player")
+        if (collision.gameObject.tag == "Player" && !neighbours.Contains(collision.gameObject))
         {
-            if (!connectedPlayers.Contains(collision.gameObject))
-            {
-                connectedPlayers.Add(collision.gameObject);
-                PlayerController obj = collision.gameObject.GetComponent<PlayerController>();
-                AgoraManager.Instance.JoinChannel(this, obj);
-                _player.sprite = _sprites[1];
-            }
+            neighbours.Add(collision.gameObject);
+            PlayerController otherPlayer = collision.gameObject.GetComponent<PlayerController>();
+            AgoraManager.Instance.JoinChannel(this, otherPlayer);
+            _player.sprite = _sprites[1];
         }
     }
     private void OnTriggerExit2D(Collider2D collision)
     {
-        if (collision.gameObject.tag == "Player")
+        if (collision.gameObject.tag == "Player" && neighbours.Contains(collision.gameObject))
         {
-            if (connectedPlayers.Contains(collision.gameObject))
+            neighbours.Remove(collision.gameObject);
+            if (neighbours.Count == 0)
             {
-                connectedPlayers.Remove(collision.gameObject);
-                if (connectedPlayers.Count == 0)
-                {
-                    AgoraManager.Instance.LeaveChannel();
-                    _channelName = string.Empty;
-                    _token = string.Empty;
-                    _player.sprite = _sprites[0];
-                }
+                AgoraManager.Instance.LeaveChannel(this);
+                _player.sprite = _sprites[0];
             }
         }
     }
