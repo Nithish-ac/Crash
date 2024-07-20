@@ -4,6 +4,7 @@ using UnityEngine;
 using Fusion;
 using Fusion.Addons.Physics;
 using static UnityEngine.RuleTile.TilingRuleOutput;
+using UnityEditor.ShaderGraph.Internal;
 
 public class PlayerController : NetworkBehaviour
 {
@@ -12,16 +13,17 @@ public class PlayerController : NetworkBehaviour
     [SerializeField] private Sprite[] _sprites;
 
     private int _playerID;
-    private string _channelName;
-    private string _token;
+    public string _channelName;
+    public string _token;
     private SpriteRenderer _player;
     private Vector2 _direction;
-    private List<GameObject> neighbours = new List<GameObject>();
-
+    private List<PlayerController> neighbours = new List<PlayerController>();
+    private AgoraManager _agoraManager;
     private void Start()
     {
         _player = GetComponent<SpriteRenderer>();
         _playerID = SetPlayerID();
+        _agoraManager = AgoraManager.Instance;
     }
 
     // Update player movement based on input
@@ -42,35 +44,75 @@ public class PlayerController : NetworkBehaviour
     // Handle player collision for audio communication
     private void OnTriggerEnter2D(Collider2D collision)
     {
-        if (collision.gameObject.tag == "Player" && !neighbours.Contains(collision.gameObject))
+        if (collision.gameObject.tag == "Player" && !neighbours.Contains(collision.gameObject.GetComponent<PlayerController>()))
         {
-            neighbours.Add(collision.gameObject);
+            neighbours.Add(collision.gameObject.GetComponent<PlayerController>());
             PlayerController otherPlayer = collision.gameObject.GetComponent<PlayerController>();
-            AgoraManager.Instance.JoinChannel(this, otherPlayer);
+            _agoraManager.JoinChannel(this, otherPlayer);
             _player.sprite = _sprites[1];
         }
     }
     private void OnTriggerExit2D(Collider2D collision)
     {
-        if (collision.gameObject.tag == "Player" && neighbours.Contains(collision.gameObject))
+        if (collision.gameObject.tag == "Player" && neighbours.Contains(collision.gameObject.GetComponent<PlayerController>()))
         {
-            neighbours.Remove(collision.gameObject);
-            if (neighbours.Count == 0)
+            if (neighbours.Count <= 1)
             {
-                AgoraManager.Instance.LeaveChannel(this);
+                neighbours.Remove(collision.gameObject.GetComponent<PlayerController>());
+                _agoraManager.LeaveChannel(this);
+                string channel = GetChannelName();
+                _agoraManager.networkTable[channel].Remove(this);
+
+                if (_agoraManager.networkTable[channel].Count == 0)
+                {
+                    _agoraManager.networkTable.Remove(channel);
+                    _agoraManager.channelCount--;
+                }
                 _player.sprite = _sprites[0];
             }
+            else
+            {
+                List<PlayerController> connectedPlayers = new List<PlayerController>(_agoraManager.networkTable[_channelName]);
+                HashSet<PlayerController> checkedPlayers = new HashSet<PlayerController>();
+                foreach (PlayerController player in connectedPlayers)
+                {
+                    if(!checkedPlayers.Contains(player) && player.neighbours.Count >= 1)
+                    {
+                        string newChannelName = _agoraManager.GenerateChannelName();
+                        AddMeAndNeighbours(player, newChannelName,new List<PlayerController>(), checkedPlayers);
+                    }
+                }
+
+            }
         }
+    }
+    private void AddMeAndNeighbours(PlayerController player,string channelName,List<PlayerController> listOfNewPlayers,HashSet<PlayerController> checkedPlayers)
+    {
+        _agoraManager.AddPlayerToChannel(channelName, player);
+        checkedPlayers.Add(player);
+        listOfNewPlayers.Add(player);
+        foreach(PlayerController neighbours in player.neighbours)
+        {
+            if (!checkedPlayers.Contains(neighbours))
+            {
+                AddMeAndNeighbours(neighbours, channelName, listOfNewPlayers, checkedPlayers);
+            } 
+        }
+        _agoraManager.networkTable.Add(channelName, listOfNewPlayers);
     }
     public string GetChannelName() { return _channelName; }
     public void SetChannelName(string name) { _channelName = name; }
 
     public string GetToken() { return _token; }
-    public void SetToken(string newToken) { _token = newToken; }
+    public void SetToken(string newToken) 
+    { 
+        Debug.Log("Setting Token = "+newToken);
+        _token = newToken;
+    }
 
     public int GetPlayerId() { return _playerID; }
     public static int SetPlayerID() => UnityEngine.Random.Range(10000, 99999);
-    public void TriggerJoin(PlayerController _playerController) => AgoraManager.Instance.JoinChannel(this,_playerController);
+    public void TriggerJoin(PlayerController _playerController) => _agoraManager.JoinChannel(this,_playerController);
 }
 
 

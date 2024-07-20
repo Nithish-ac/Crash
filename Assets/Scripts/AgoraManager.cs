@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using Fusion;
+using WebSocketSharp;
 public class AgoraManager : MonoBehaviour
 {
     public static AgoraManager Instance { get; private set; }
@@ -15,14 +16,15 @@ public class AgoraManager : MonoBehaviour
 
     private IRtcEngine RtcEngine;
 
-    private string token = "";
-    private string channelName = "";
+    private string _token = "";
+    private string _channelName ="";
     private PlayerController mainPlayerInfo;
 
     public CONNECTION_STATE_TYPE connectionState = CONNECTION_STATE_TYPE.CONNECTION_STATE_DISCONNECTED;
-
-    public NetworkDictionary<string, List<PlayerController>> networkTable = new NetworkDictionary<string, List<PlayerController>>();
-    private int channelCount = 0;
+    [Networked]
+    public Dictionary<string, List<PlayerController>> networkTable { get; set; }
+    [Networked]
+    public int channelCount { get; set; }
 
 
     private void Awake()
@@ -32,6 +34,7 @@ public class AgoraManager : MonoBehaviour
 
     private void Start()
     {
+        networkTable=new Dictionary<string, List<PlayerController>>();
         InitRtcEngine();
         SetBasicConfiguration();
     }
@@ -92,97 +95,97 @@ public class AgoraManager : MonoBehaviour
             MergeChannels(player1.GetChannelName(), player2.GetChannelName());
         }
     }
-    private void AddPlayerToChannel(string channelName, PlayerController player)
+    public void AddPlayerToChannel(string channelName, PlayerController player)
     {
+        Debug.Log("Channel Name = "+ channelName);
+
         if (!networkTable.ContainsKey(channelName))
         {
             networkTable[channelName] = new List<PlayerController>();
             channelCount++;
         }
         networkTable[channelName].Add(player);
-        player.SetChannelName(channelName);
-        player.SetToken(GetTokenForChannel(channelName));
+        player._channelName = channelName;
 
-        if (token.Length == 0)
+        string tempToekn =GetTokenForChannel(channelName);
+
+        if (!tempToekn.IsNullOrEmpty())
         {
-            StartCoroutine(HelperClass.FetchToken(tokenBase, channelName, player.GetPlayerId(), UpdateToken));
-            return;
+            Debug.Log("token" + GetTokenForChannel(channelName));
+            player.SetToken(GetTokenForChannel(channelName));
         }
-
-        RtcEngine.JoinChannel(token, channelName, "", (uint)player.GetPlayerId());
+        else
+        {
+            if (_token.Length == 0)
+            {
+                StartCoroutine(HelperClass.FetchToken(tokenBase, channelName, player.GetPlayerId(), UpdateToken));
+                //return;
+            }
+        }
+        player._token = _token;
+        Debug.Log("Actual token" + _token);
+        RtcEngine.JoinChannel(_token, channelName, "", (uint)player.GetPlayerId());
         RtcEngine.StartPreview();
     }
     private void MergeChannels(string channel1, string channel2)
     {
-        List<PlayerController> channel1Players = networkTable[channel1];
-        List<PlayerController> channel2Players = networkTable[channel2];
+        if (!networkTable.ContainsKey(channel1) || !networkTable.ContainsKey(channel2)) return;
 
-        if (channel1Players.Count >= channel2Players.Count)
+        List<PlayerController> channel1Players = new List<PlayerController>(networkTable[channel1]);
+        List<PlayerController> channel2Players = new List<PlayerController>(networkTable[channel2]);
+        string targetChannel = channel1Players.Count >= channel2Players.Count ? channel1 : channel2;
+        string sourceChannel = channel1Players.Count >= channel2Players.Count ? channel2 : channel1;
+
+        List<PlayerController> playersToMove = new List<PlayerController>(networkTable[sourceChannel]);
+
+        foreach (var player in playersToMove)
         {
-            foreach (var player in channel2Players)
-            {
-                AddPlayerToChannel(channel1, player);
-            }
-            networkTable.Remove(channel2);
+            AddPlayerToChannel(targetChannel, player);
         }
-        else
-        {
-            foreach (var player in channel1Players)
-            {
-                AddPlayerToChannel(channel2, player);
-            }
-            networkTable.Remove(channel1);
-        }
+
+        networkTable.Remove(sourceChannel);
         channelCount--;
     }
+
     public void LeaveChannel(PlayerController player)
     {
-        string channel = player.GetChannelName();
-        networkTable[channel].Remove(player);
-
-        if (networkTable[channel].Count == 0)
-        {
-            networkTable.Remove(channel);
-            channelCount--;
-        }
-
         RtcEngine.LeaveChannel();
         player.SetChannelName(string.Empty);
         player.SetToken(string.Empty);
     }
     private void UpdateToken(string newToken)
     {
-        token = newToken;
-        if (string.IsNullOrEmpty(channelName)) return;
+        _token = newToken;
+        if (string.IsNullOrEmpty(_channelName)) return;
 
-        foreach (var player in networkTable[channelName])
-        {
-            player.SetToken(token);
-        }
+        //foreach (var player in networkTable[_channelName])
+        //{
+        //    player.SetToken(_token);
+        //}
     }
-    private void JoinChannel()
-    {
-        //If a token is not yet generated, we first generate one and then join the channel
-        try
-        {
-            if (token.Length == 0)
-            {
-                StartCoroutine(HelperClass.FetchToken(tokenBase, channelName, 0, UpdateToken));
-                Debug.Log("Token fetching initiated");
-                return;
-            }
+    //private void JoinChannel()
+    //{
+    //    //If a token is not yet generated, we first generate one and then join the channel
+    //    try
+    //    {
+    //        if (token.Length == 0)
+    //        {
+    //            StartCoroutine(HelperClass.FetchToken(tokenBase, channelName, 0, UpdateToken));
+    //            Debug.Log("Token fetching initiated");
+    //            return;
+    //        }
             
-            RtcEngine.JoinChannel(token, channelName, "", 0);
-            RtcEngine.StartPreview();
-            MakeVideoView(0);
+    //        RtcEngine.JoinChannel(token, channelName, "", 0);
+    //        RtcEngine.StartPreview();
+    //        MakeVideoView(0);
 
-            Debug.Log($"Joined channel: {channelName} with token: {token}");
-        }
-        catch (Exception ex)
-        {
-            Debug.LogError($"Error joining channel: {ex.Message}");
-        }
-    }
+    //        Debug.Log($"Joined channel: {channelName} with token: {token}");
+    //    }
+    //    catch (Exception ex)
+    //    {
+    //        Debug.LogError($"Error joining channel: {ex.Message}");
+    //    }
+    //}
 
     /// <summary>
     /// Responsible for leaving a channel for the user and destroying video views
@@ -216,13 +219,13 @@ public class AgoraManager : MonoBehaviour
     /// Generate a channel name at the runtime
     /// </summary>
     /// <returns></returns>
-    private string GenerateChannelName()
+    public string GenerateChannelName()
     {
         return "user_channel_" + (++channelCount);
     }
     private string GetTokenForChannel(string channelName)
     {
-        return token; // Placeholder for fetching/generating a token
+        return _token; // Placeholder for fetching/generating a token
     }
 
     /// <summary>
@@ -260,8 +263,8 @@ public class AgoraManager : MonoBehaviour
 
         if (player == mainPlayerInfo)
         {
-            this.channelName = channelName;
-            this.token = token;
+            this._channelName = channelName;
+            this._token = token;
         }
     }
 
