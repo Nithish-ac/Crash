@@ -77,19 +77,22 @@ public class AgoraManager : MonoBehaviour
     #region Channel Join/Leave Handler Functions
     public void JoinChannel(PlayerController player1, PlayerController player2)
     {
+        mainPlayerInfo = player1;
         Debug.Log("Player Channel name Before =" + player1.GetChannelName() + " and" + player2.GetChannelName());
         if (string.IsNullOrEmpty(player1.GetChannelName()) && string.IsNullOrEmpty(player2.GetChannelName()))
         {
             string newChannelName = GenerateChannelName();
-            Debug.Log("Generated Channel Name =" + newChannelName);
+            Debug.Log("newchannel ");
             AddPlayerToChannel(newChannelName, player1);
         }
         else if (!string.IsNullOrEmpty(player1.GetChannelName()) && string.IsNullOrEmpty(player2.GetChannelName()))
         {
+            Debug.Log("joing Channel of player 1");
             AddPlayerToChannel(player1.GetChannelName(), player2);
         }
         else if (string.IsNullOrEmpty(player1.GetChannelName()) && !string.IsNullOrEmpty(player2.GetChannelName()))
         {
+            Debug.Log("joing Channel of player 2");
             AddPlayerToChannel(player2.GetChannelName(), player1);
         }
         else if (player1.GetChannelName() != player2.GetChannelName())
