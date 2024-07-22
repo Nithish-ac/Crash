@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.UI;
 using Fusion;
 using WebSocketSharp;
+using UnityEditor.Timeline.Actions;
 public class AgoraManager : MonoBehaviour
 {
     public static AgoraManager Instance { get; private set; }
@@ -76,11 +77,12 @@ public class AgoraManager : MonoBehaviour
     #region Channel Join/Leave Handler Functions
     public void JoinChannel(PlayerController player1, PlayerController player2)
     {
+        Debug.Log("Player Channel name Before =" + player1.GetChannelName() + " and" + player2.GetChannelName());
         if (string.IsNullOrEmpty(player1.GetChannelName()) && string.IsNullOrEmpty(player2.GetChannelName()))
         {
             string newChannelName = GenerateChannelName();
+            Debug.Log("Generated Channel Name =" + newChannelName);
             AddPlayerToChannel(newChannelName, player1);
-            AddPlayerToChannel(newChannelName, player2);
         }
         else if (!string.IsNullOrEmpty(player1.GetChannelName()) && string.IsNullOrEmpty(player2.GetChannelName()))
         {
@@ -90,21 +92,15 @@ public class AgoraManager : MonoBehaviour
         {
             AddPlayerToChannel(player2.GetChannelName(), player1);
         }
-        else
+        else if (player1.GetChannelName() != player2.GetChannelName())
         {
+            Debug.Log("Player Channel name After =" + player1.GetChannelName() + " and" + player2.GetChannelName());
             MergeChannels(player1.GetChannelName(), player2.GetChannelName());
         }
     }
     public void AddPlayerToChannel(string channelName, PlayerController player)
     {
-        Debug.Log("Channel Name = "+ channelName);
-
-        if (!networkTable.ContainsKey(channelName))
-        {
-            networkTable[channelName] = new List<PlayerController>();
-            channelCount++;
-        }
-        networkTable[channelName].Add(player);
+        Rpc_UpdateNetworkTable("add", channelName, player);
         player._channelName = channelName;
 
         string tempToekn =GetTokenForChannel(channelName);
@@ -119,11 +115,9 @@ public class AgoraManager : MonoBehaviour
             if (_token.Length == 0)
             {
                 StartCoroutine(HelperClass.FetchToken(tokenBase, channelName, player.GetPlayerId(), UpdateToken));
-                //return;
             }
         }
         player._token = _token;
-        Debug.Log("Actual token" + _token);
         RtcEngine.JoinChannel(_token, channelName, "", (uint)player.GetPlayerId());
         RtcEngine.StartPreview();
     }
@@ -140,18 +134,60 @@ public class AgoraManager : MonoBehaviour
 
         foreach (var player in playersToMove)
         {
+            Rpc_UpdateNetworkTable("remove", sourceChannel,player);
+            LeaveChannel(player);
             AddPlayerToChannel(targetChannel, player);
         }
-
-        networkTable.Remove(sourceChannel);
-        channelCount--;
     }
+    [Rpc]
+    public void Rpc_UpdateNetworkTable(string action, string channelName, PlayerController player = null, string sourceChannel = null)
+    {
+        if (action == "add")
+        {
+            if (!networkTable.ContainsKey(channelName))
+            {
+                networkTable[channelName] = new List<PlayerController>();
+                networkTable[channelName].Add(player);
+            }
+            else if (!networkTable[channelName].Contains(player))
+            {
+                networkTable[channelName].Add(player);
+            }
+        }
+        else if (action == "remove")
+        {
+            if (networkTable.ContainsKey(channelName))
+            {
+                if(player!= null)
+                    networkTable[channelName].Remove(player);
+                if (networkTable[channelName].Count == 0)
+                {
+                    networkTable.Remove(channelName);
+                    channelCount--;
+                }
+            }
+        }
+        else if (action == "merge")
+        {
+            if (!networkTable.ContainsKey(channelName) || !networkTable.ContainsKey(sourceChannel)) return;
 
+            List<PlayerController> sourcePlayers = new List<PlayerController>(networkTable[sourceChannel]);
+
+            foreach (var playerToMove in sourcePlayers)
+            {
+                Rpc_UpdateNetworkTable("add", channelName, playerToMove);
+            }
+
+            Rpc_UpdateNetworkTable("remove", sourceChannel);
+        }
+    }
     public void LeaveChannel(PlayerController player)
     {
+        Debug.Log(player.name + "Leaving Channel");
         RtcEngine.LeaveChannel();
         player.SetChannelName(string.Empty);
         player.SetToken(string.Empty);
+        Debug.Log("player Leaved");
     }
     private void UpdateToken(string newToken)
     {
@@ -228,28 +264,6 @@ public class AgoraManager : MonoBehaviour
         return _token; // Placeholder for fetching/generating a token
     }
 
-    /// <summary>
-    /// Generate a random channel name of a specified length
-    /// </summary>
-    /// <param name="length">
-    /// Required length for the channel name
-    /// </param>
-    /// <returns>
-    /// Returns a randomly generated channel name
-    /// </returns>
-    private string GetRandomChannelName(int length)
-    {
-        string characters = "abcdefghijklmnopqrstuvwxyzABCDDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-
-        string randomChannelName = "";
-
-        for (int i = 0; i < length; i++)
-        {
-            randomChannelName += characters[UnityEngine.Random.Range(0, characters.Length)];
-        }
-        Debug.Log("RandomChannel name ="+randomChannelName);
-        return randomChannelName;
-    }
     /// <summary>
     /// Responsible for updating channel name and token of a player with the given values
     /// </summary>

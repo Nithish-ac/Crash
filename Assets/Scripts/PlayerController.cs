@@ -59,15 +59,9 @@ public class PlayerController : NetworkBehaviour
             if (neighbours.Count <= 1)
             {
                 neighbours.Remove(collision.gameObject.GetComponent<PlayerController>());
-                _agoraManager.LeaveChannel(this);
                 string channel = GetChannelName();
-                _agoraManager.networkTable[channel].Remove(this);
-
-                if (_agoraManager.networkTable[channel].Count == 0)
-                {
-                    _agoraManager.networkTable.Remove(channel);
-                    _agoraManager.channelCount--;
-                }
+                _agoraManager.LeaveChannel(this);
+                _agoraManager.Rpc_UpdateNetworkTable("Remove",channel,this);
                 _player.sprite = _sprites[0];
             }
             else
@@ -88,6 +82,7 @@ public class PlayerController : NetworkBehaviour
     }
     private void AddMeAndNeighbours(PlayerController player,string channelName,List<PlayerController> listOfNewPlayers,HashSet<PlayerController> checkedPlayers)
     {
+        _agoraManager.LeaveChannel(player);
         _agoraManager.AddPlayerToChannel(channelName, player);
         checkedPlayers.Add(player);
         listOfNewPlayers.Add(player);
@@ -98,7 +93,6 @@ public class PlayerController : NetworkBehaviour
                 AddMeAndNeighbours(neighbours, channelName, listOfNewPlayers, checkedPlayers);
             } 
         }
-        _agoraManager.networkTable.Add(channelName, listOfNewPlayers);
     }
     public string GetChannelName() { return _channelName; }
     public void SetChannelName(string name) { _channelName = name; }
